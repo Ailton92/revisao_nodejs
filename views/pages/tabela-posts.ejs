@@ -4,12 +4,13 @@
 <%- include("../partials/head") %>
 <%- include("../partials/menu") %>
 <body>    
-  <center><h1>Usuário ou senha inválidos!</h1><br><br><br>
-    
+    Posts<br><br><br>
+    <center>
+    <main>
+        <%- include("../partials/posttable.ejs") %>
+    </main>
+</center>
     <br><br><br><br><br><br><a href="/">Home</a>
-  </center>
     <%- include("../partials/footer") %>
-    <link rel="styleheet" href="./static/style.css">
-
 </body>
 </html>

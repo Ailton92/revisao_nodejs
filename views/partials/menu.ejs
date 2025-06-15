@@ -1,12 +1,15 @@
 <menu>
+    <img src='./static/3.png' id="img-m">
     <nav>
-    <a href="/sobre">Página Sobre</a>
+    <a href="/sobre">Sobre</a>
+    <a href="/tabela-posts">Posts</a>
     <% if(!req.session.loggedin) { %>
     <a href="/cadastro">Cadastro</a>
     <a href="/login">Login</a>
     <% } else { %>
     <a href="/dashboard">Dashboard</a>
-    <a href="/post_create">Criação de Postagem</a>
+    <a href="/tabela-posts">Posts</a>
+    <a href="/post_create">Criar Post</a>
     <a href="/logout">Logout</a>
     <% } %>
     </nav>

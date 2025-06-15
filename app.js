@@ -17,6 +17,7 @@ db.serialize(() => {
     db.run(
         "CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, id_users INTEGER, titulo TEXT, conteudo TEXT, data_criacao TEXT)"
     )
+
 })
 
 app.use(
@@ -57,9 +58,16 @@ app.post("/cadastro", (req, res) => {
     console.log(JSON.stringify(req.body));
     const { username, password } = req.body;
 
+    if (!username || !password || username.trim() === '' || password.trim() === '') {
+    // Se estiverem vazios, retorna erro HTTP 400 (requisição inválida)
+     return res.status(400).send('Usuário e senha são obrigatórios.');
+  }   
+
     const query = "SELECT * FROM users WHERE username =?"
 
+
     db.get(query, [username,], (err, row) => {
+        
         if (err) throw err;
 
         //1. Verificar se o usuário existe
@@ -75,9 +83,10 @@ app.post("/cadastro", (req, res) => {
                 if (err) throw err;
 
                 console.log(`Usuário: ${username} cadastrado com sucesso.`)
-                res.redirect("/cadastro-com-sucesso");
+                res.redirect("/login");
             })
         }
+          
 
 
     })
@@ -139,6 +148,11 @@ app.post("/post_create", (req, res) =>{
     if(req.session.loggedin){
     console.log("Dados da postagem: ", req.body);
     const { titulo, conteudo} = req.body;
+       if (!titulo || !conteudo || titulo.trim() === '' || conteudo.trim() === '') {
+    // Se estiverem vazios, retorna erro HTTP 400 (requisição inválida)
+     return res.status(400).send('Usuário e senha são obrigatórios.');
+  }   
+
     const data_criacao = new Date();
     const data = data_criacao.toLocaleDateString();
     console.log("Data da criação:", data, "Username: ", req.session.username, "id_username: ", req.session.id_username);
@@ -147,7 +161,7 @@ app.post("/post_create", (req, res) =>{
 
     db.get(query, [req.session.id_username, titulo, conteudo, data], (err) =>{
         if(err) throw err;
-        res.send('Post criado');
+        res.redirect('/tabela-posts');
     })
 
     } else {
@@ -176,6 +190,22 @@ app.get("/dashboard", (req, res) => {
     } else {
         res.redirect("/nao-autorizado");
     }
+});
+
+app.get("/tabela-posts", (req, res) => {
+    console.log("GET /tabela-posts")
+    //res.render("./pages/dashboard", {titulo: "Dashboard"});
+    //Listar todos os usurios
+    //if(req.session.loggedin){
+    const query = "SELECT * FROM posts";
+    db.all(query, [], (err, row) => {
+        if (err) throw err;
+        console.log(JSON.stringify(row));
+        res.render("pages/tabela-posts", { titulo: "Tabela de posts", dados: row, req: req });
+    })
+    //} else {
+        //res.redirect("/nao-autorizado");
+    //}
 });
 
 app.get("/nao-autorizado", (req, res) => {

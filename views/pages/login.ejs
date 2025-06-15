@@ -4,18 +4,21 @@
 <%- include("../partials/head") %>
 <%- include("../partials/menu") %>
 <body>    
-    Página de login<br><br><br>
+  <center><h1>Login</h1><br>
     <main>
         <form action="/login" method="post" class="formItens">
-            Seu nome:
+            <p>Nome:</p>
             <input type="text" name="username" id="username" placeholder="Digite seu nome de usuário"><br><br>
-            Senha:
+            <p>Senha:</p>
             <input type="password" name="password" id="senha" placeholder="Digite sua senha"><br>
             <button type="submit">Entrar</button>
         </form>
     </main><br>
     
     <br><br><a href="/">Home</a>
+  </center>
     <%- include("../partials/footer") %>
+    <link rel="stylesheet" href="./static/style.css">
+
 </body>
 </html>

@@ -4,10 +4,10 @@
 <%- include("../partials/head") %>
 <%- include("../partials/menu") %>
 <body>    
-    <br><br><br>
+  <center><h1>Criar Post</h1><br>
     <main>
         <form action="/post_create" method="post">
-            <label for="titulo">Titulo:</label><br>
+            <label for="titulo">Título:</label><br>
             <input type="text" id="titulo" name="titulo" required/><br><br>
             <label for="conteudo">Conteúdo:</label><br>
             <textarea id="conteudo" name="conteudo" rows="10" cols="70" required></textarea><br>
@@ -16,6 +16,9 @@
         </form>
     </main>
     <br><br><br><br><br><br><a href="/">Home</a>
+   </center>
     <%- include("../partials/footer") %>
+   <link rel="stylesheet" href="./static/style.css">
+
 </body>
 </html>
