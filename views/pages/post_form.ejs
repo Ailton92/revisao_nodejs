@@ -4,10 +4,10 @@
 <%- include("../partials/head") %>
 <%- include("../partials/menu") %>
 <body>    
-    <br><br><br>
+  <center><h1>Adicionar Comentário</h1>
     <main>
         <form action="/post_create" method="post">
-            <label for="titulo">Titulo:</label><br>
+            <label for="titulo">Título:</label><br>
             <input type="text" id="titulo" name="titulo" required/><br><br>
             <label for="conteudo">Conteúdo:</label><br>
             <textarea id="conteudo" name="conteudo" rows="10" cols="70" required></textarea><br>
@@ -15,7 +15,10 @@
             <button type="submit">Cadastrar postagem</button>     
         </form>
     </main>
-    <br><br><br><br><br><br><a href="/">Home</a>
+    <br><br><br><br><br><br>
+   </center>
     <%- include("../partials/footer") %>
+   <link rel="stylesheet" href="./static/styles.css">
+
 </body>
 </html>

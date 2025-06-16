@@ -4,16 +4,19 @@
 <%- include("../partials/head") %>
 <%- include("../partials/menu") %>
 <body>    
-    Página de cadastro<br><br><br>
+  <center><h1>Cadastro</h1><br>
     <main><form action="/cadastro" method="post" class="formItens">
-        Seu nome:
-        <input type="text" name="username" id="username" placeholder="Digite seu nome de usuário"><br><br>
-        Senha:
-        <input type="password" name="password" id="password" placeholder="Digite sua senha"><br>
-        <button type="submit">Entrar</button>
+        <p>Nome:</p>
+        <input type="text" name="username" id="username" placeholder="Digite seu nome de usuário" required><br><br>
+        <p>Senha:</p>
+        <input type="password" name="password" id="password" placeholder="Digite sua senha" required><br>
+        <button type="submit">Cadastrar</button>
     </form></main>
     
-    <br><br><br><br><br><br><a href="/">Home</a>
+    <br><br><br><br><br><br>
+</center>
     <%- include("../partials/footer") %>
+    <link rel="stylesheet" href="./static/styles.css">
+
 </body>
 </html>

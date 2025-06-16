@@ -1,22 +1,33 @@
 const express = require("express");
 const session = require("express-session");
 const sqlite3 = require("sqlite3");
+const helmet = require("helmet");
+const cors = require("cors");
+const bodyparser = require("body-parser");
+
 //const bodyparser = require("body-parser");
 
 const app = express();
+
+app.use(helmet())
+app.use(bodyparser.json({limit:"3mb"}))
 
 const PORT = 8000;
 
 //Conexao com o BD
 const db = new sqlite3.Database("users.db");
 
+const { body, validationResult } = require('express-validator');
+const bcrypt = require('bcrypt');
+
 db.serialize(() => {
     db.run(
-        "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT)"
+        "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT, perfil TEXT(3))"
     )
     db.run(
         "CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, id_users INTEGER, titulo TEXT, conteudo TEXT, data_criacao TEXT)"
     )
+
 })
 
 app.use(
@@ -52,112 +63,167 @@ app.get("/cadastro", (req, res) => {
     res.render("./pages/cadastro", { titulo: "Cadastro", req: req });
 });
 
-app.post("/cadastro", (req, res) => {
+app.post("/cadastro", [
+    // Validação dos campos
+    body('username')
+        .isAlphanumeric().withMessage('Usuário deve conter apenas letras e números.')
+        .trim().escape(),
+    body('password')
+        .isLength({ min: 3 }).withMessage('A senha deve ter pelo menos 3 caracteres.')
+        .trim()
+], async (req, res) => {
     console.log("POST /cadastro");
     console.log(JSON.stringify(req.body));
+
+    // Verifica erros de validação
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        console.log("Erros de validação:", errors.array());
+        return res.status(400).send('Dados inválidos: ' + errors.array().map(e => e.msg).join(', '));
+    }
+
     const { username, password } = req.body;
 
-    const query = "SELECT * FROM users WHERE username =?"
-
-    db.get(query, [username,], (err, row) => {
-        if (err) throw err;
-
-        //1. Verificar se o usuário existe
-        console.log("Query SELECT do cadastro:", JSON.stringify(row));
-        if (row) {
-            //2. Se o usuário existir e a senha é válida no BD, executar processo de login
-            console.log(`Usuário: ${username} já cadastrado.`);
-            res.redirect("/ja-cadastrado");
-        } else {
-            //3. Se não, executar processo de negação de login
-            const insert = "INSERT INTO users (username, password) VALUES (?,?)"
-            db.get(insert, [username, password], (err, row) => {
-                if (err) throw err;
-
-                console.log(`Usuário: ${username} cadastrado com sucesso.`)
-                res.redirect("/cadastro-com-sucesso");
-            })
+    const query = "SELECT * FROM users WHERE username = ?";
+    db.get(query, [username], async (err, row) => {
+        if (err) {
+            console.error("Erro na consulta SELECT:", err);
+            return res.status(500).send("Erro no servidor");
         }
 
+        if (row) {
+            console.log(`Usuário: ${username} já cadastrado.`);
+            return res.redirect("/ja-cadastrado");
+        }
 
-    })
+        // Cria hash da senha com bcrypt
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        const perfil = "usr"
 
-    //res.render("./pages/login");
-})
+        const insert = "INSERT INTO users (username, password, perfil) VALUES (?, ?, ?)";
+        db.run(insert, [username, hashedPassword, perfil ], function (err) {
+            if (err) {
+                console.error("Erro ao inserir usuário:", err);
+                return res.status(500).send("Erro ao cadastrar");
+            }
+
+            console.log(`Usuário: ${username} cadastrado com sucesso.`);
+            res.redirect("/login");
+        });
+    });
+});
 
 app.get("/login", (req, res) => {
     console.log("GET /login")
     res.render("./pages/login", { titulo: "Login", req: req });
 });
 
-app.post("/login", (req, res) => {
-    console.log("POST /login")
-    console.log(JSON.stringify(req.body));
-    const { username, password } = req.body;
+app.post("/login", [
+  body('username').isAlphanumeric().withMessage('Usuário inválido').trim().escape(),
+  body('password').isLength({ min: 3 }).withMessage('Senha inválida').trim()
+], (req, res) => {
+  console.log("POST /login");
+  console.log(JSON.stringify(req.body));
 
-    const query = "SELECT * FROM users WHERE username=? AND password=?"
-    db.get(query, [username, password], (err, row) => {
-        if (err) throw err;
+  //  Verifica se os dados passaram na validação
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    console.log("Erros de validação:", errors.array());
+    return res.redirect("/incorreto"); // Página de erro de login
+  }
 
-        //1. Verificar se o usuário existe
-        console.log(JSON.stringify(row));
-        if (row) {
-            console.log("SELECT da tabela users: ", row);
-            //2. Se o usuário existir e a senha é válida no BD, executar processo de login
-            req.session.username = username;
-            req.session.loggedin = true;
-            req.session.id_username = row.id;
-            res.redirect("/dashboard");
+  const { username, password } = req.body;
+
+  //  Busca o usuário pelo username (sem comparar senha ainda)
+  const query = "SELECT * FROM users WHERE username = ?";
+  db.get(query, [username], async (err, row) => {
+    if (err) {
+      console.error("Erro no banco:", err);
+      return res.status(500).send("Erro interno no servidor");
+    }
+
+    // Se o usuário não existe
+    if (!row) {
+      console.log("Usuário não encontrado.");
+      return res.redirect("/incorreto");
+    }
+
+    try {
+      //  Compara a senha digitada com o hash salvo
+      const match = await bcrypt.compare(password, row.password);
+
+      if (match) {
+        // Senha correta
+        req.session.username = username;
+        req.session.loggedin = true;
+        req.session.id_username = row.id;
+        req.session.perfil = row.perfil;
+
+        if (row.perfil == "adm") {
+          req.session.adm = true;
+          return res.redirect("/dashboard"); // Rota exclusiva para admin
         } else {
-            //3. Se não, executar processo de negação de login
-            res.redirect("/incorreto");
+          req.session.adm = false;
+          return res.redirect("/"); // Página padrão do usuário
         }
+      } else {
+        console.log("Senha incorreta.");
+        return res.redirect("/incorreto");
+      }
 
-
-    })
-
-    //res.render("./pages/login");
+    } catch (compareError) {
+      console.error("Erro ao comparar senhas:", compareError);
+      return res.status(500).send("Erro interno ao verificar senha");
+    }
+  });
 });
 
-app.get("/post_create", (req, res) =>{
+
+app.get("/post_create", (req, res) => {
     console.log("GET /post_create");
     //verificar se o usuário está logado
     //se estiver logado, envie o formulário para a criação do post
-    if(req.session.loggedin){
-        res.render("pages/post_form", {titulo: "Criar postagem", req: req})
+    if (req.session.loggedin) {
+        res.render("pages/post_form", { titulo: "Criar postagem", req: req })
     } else {  // se não estiver logado, redirect para /nao-autorizado
         res.redirect("/nao-autorizado")
     }
-    
+
 });
 
-app.post("/post_create", (req, res) =>{
+app.post("/post_create", (req, res) => {
     console.log("POST /post_create");
     //Pegar dados da postagem: UserID, Titulo Postagem, Conteúdo da postagem, Data da postagem
 
     //req.session.username, req.session.id_username
-    if(req.session.loggedin){
-    console.log("Dados da postagem: ", req.body);
-    const { titulo, conteudo} = req.body;
-    const data_criacao = new Date();
-    const data = data_criacao.toLocaleDateString();
-    console.log("Data da criação:", data, "Username: ", req.session.username, "id_username: ", req.session.id_username);
+    if (req.session.loggedin) {
+        console.log("Dados da postagem: ", req.body);
+        const { titulo, conteudo } = req.body;
+        if (!titulo || !conteudo || titulo.trim() === '' || conteudo.trim() === '') {
+            // Se estiverem vazios, retorna erro HTTP 400 (requisição inválida)
+            return res.status(400).send('Usuário e senha são obrigatórios.');
+        }
 
-    const query = "INSERT INTO posts (id_users, titulo, conteudo, data_criacao) VALUES (?, ?, ?, ?)"
+        const data_criacao = new Date();
+        const data = data_criacao.toLocaleDateString();
+        console.log("Data da criação:", data, "Username: ", req.session.username, "id_username: ", req.session.id_username);
 
-    db.get(query, [req.session.id_username, titulo, conteudo, data], (err) =>{
-        if(err) throw err;
-        res.send('Post criado');
-    })
+        const query = "INSERT INTO posts (id_users, titulo, conteudo, data_criacao) VALUES (?, ?, ?, ?)"
+
+        db.get(query, [req.session.id_username, titulo, conteudo, data], (err) => {
+            if (err) throw err;
+            res.redirect('/tabela-posts');
+        })
 
     } else {
         res.redirect("/nao-autorizado");
     }
 })
 
-app.get("/logout", (req, res) =>{
+app.get("/logout", (req, res) => {
     console.log("GET /logout");
-    req.session.destroy(() =>{
+    req.session.destroy(() => {
         res.redirect("/");
     });
 });
@@ -166,16 +232,32 @@ app.get("/dashboard", (req, res) => {
     console.log("GET /dashboard")
     //res.render("./pages/dashboard", {titulo: "Dashboard"});
     //Listar todos os usurios
-    if(req.session.loggedin){
-    const query = "SELECT * FROM users";
-    db.all(query, [], (err, row) => {
-        if (err) throw err;
-        console.log(JSON.stringify(row));
-        res.render("pages/dashboard", { titulo: "Tabela de usuários", dados: row, req: req });
-    })
+    if (req.session.adm) {
+        const query = "SELECT * FROM users";
+        db.all(query, [], (err, row) => {
+            if (err) throw err;
+            console.log(JSON.stringify(row));
+            res.render("pages/dashboard", { titulo: "Tabela de usuários", dados: row, req: req });
+        })
     } else {
         res.redirect("/nao-autorizado");
     }
+});
+
+app.get("/tabela-posts", (req, res) => {
+    console.log("GET /tabela-posts")
+    //res.render("./pages/dashboard", {titulo: "Dashboard"});
+    //Listar todos os usurios
+    //if(req.session.loggedin){
+    const query = "SELECT * FROM posts";
+    db.all(query, [], (err, row) => {
+        if (err) throw err;
+        console.log(JSON.stringify(row));
+        res.render("pages/tabela-posts", { titulo: "Tabela de posts", dados: row, req: req });
+    })
+    //} else {
+    //res.redirect("/nao-autorizado");
+    //}
 });
 
 app.get("/nao-autorizado", (req, res) => {
@@ -200,7 +282,7 @@ app.get("/cadastro-com-sucesso", (req, res) => {
 
 app.use('/{*erro}', (req, res) => {
     res.status(404).render('./pages/erro404', { titulo: "ERRO 404", req: req, msg: "404" });
-  });
+});
 
 app.listen(PORT);
 
@@ -208,3 +290,5 @@ app.listen(PORT, () => {
     console.log(`Servidor sendo executado na porta ${PORT}`);
     console.log(__dirname + "\\static");
 });
+
+//Senha do usuario é 123456
